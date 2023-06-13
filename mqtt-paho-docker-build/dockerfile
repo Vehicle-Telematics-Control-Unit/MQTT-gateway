@@ -1,0 +1,29 @@
+FROM vsomeip_build:v0
+
+
+RUN apk update && \
+    apk add --no-cache openssl
+
+RUN apk add --no-cache openssl-dev
+
+WORKDIR /
+
+RUN git clone https://github.com/eclipse/paho.mqtt.c.git
+# RUN cd paho.mqtt.c
+WORKDIR /paho.mqtt.c
+RUN git checkout v1.3.8
+RUN cmake -Bbuild -H. -DPAHO_ENABLE_TESTING=OFF -DPAHO_BUILD_STATIC=ON \
+    -DPAHO_WITH_SSL=ON -DPAHO_HIGH_PERFORMANCE=ON
+RUN cmake --build build/ --target install
+# RUN ldconfig
+
+WORKDIR /
+RUN git clone https://github.com/eclipse/paho.mqtt.cpp
+WORKDIR /paho.mqtt.cpp
+
+RUN cmake -Bbuild -H. -DPAHO_BUILD_STATIC=ON \
+    -DPAHO_BUILD_DOCUMENTATION=FALSE -DPAHO_BUILD_SAMPLES=FALSE
+RUN cmake --build build/ --target install
+
+WORKDIR /
+# RUN ldconfig

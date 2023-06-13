@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/abbas/grad_proj_repos/MQTT-gateway/build",
+  "command": "/usr/bin/g++ -DOPENSSL=1 -I/home/abbas/grad_proj_repos/MQTT-gateway/src_build/dependencies -g -std=gnu++17 -o CMakeFiles/MQTTclient_tst.dir/main.cpp.o -c /home/abbas/grad_proj_repos/MQTT-gateway/src_build/main.cpp",
+  "file": "/home/abbas/grad_proj_repos/MQTT-gateway/src_build/main.cpp",
+  "output": "CMakeFiles/MQTTclient_tst.dir/main.cpp.o"
+}
+]
