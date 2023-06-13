@@ -1,1 +1,0 @@
-/usr/bin/g++ -g -rdynamic CMakeFiles/my_mqtt_app.dir/main.cpp.o -o my_mqtt_app  -Wl,-rpath,/usr/local/lib /usr/local/lib/libpaho-mqttpp3.so.1.2.0 /usr/local/lib/libpaho-mqtt3as.so /usr/lib/libssl.so /usr/lib/libcrypto.so 
