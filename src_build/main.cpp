@@ -11,27 +11,33 @@
 #include <memory>
 #include <atomic>
 #include <future>
+#include <optional>
 
 #include "mqtt/async_client.h"
-
 #include "VsomeipAgent.hpp"
 #include "nlohmann/json.hpp"
+
+
+#define TESTING_MODE 1
 
 static constexpr char DFLT_SERVER_ADDRESS[] = "tcp://localhost:1883";
 static constexpr char CLIENT_ID[] = "multithr_pub_sub_cpp";
 
-std::string requestMQTTcredentials(std::shared_ptr<VsomeipAgent> vsomeipagent)
+std::optional<std::string> requestMQTTcredentials(std::shared_ptr<VsomeipAgent> vsomeipagent)
 {
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    // while(! vsomeipagent->serviceAvailability[BACKEND_REQUEST_SERVER_SERVICE_ID])
+    //     std::this_thread::sleep_for(std::chrono::seconds(2));
+    
     using json = nlohmann::json;
     // TODO: change this to meaningful data
     json jsonMessage = {
-        {"route", "mqtt/credentials"},
-        {"vin", "12334"},
+        {"route", "authentication/mqtt/getCredentials/TCU"},
+        {"vin", "12"}
     };
-    vsomeipagent->sendToBackEndGateWay(jsonMessage.dump(3));
+    std::string dataToSend = jsonMessage.dump(3);
+    vsomeipagent->sendToBackEndGateWay(dataToSend);
     // wait till it gets updated
-    const uint8_t timeoutSeconds = 5;
+    const uint8_t timeoutSeconds = 1;
     auto start = std::chrono::steady_clock::now();
     while (!vsomeipagent->getBackEndResponse().second)
     {
@@ -40,7 +46,7 @@ std::string requestMQTTcredentials(std::shared_ptr<VsomeipAgent> vsomeipagent)
         if (duration.count() >= timeoutSeconds)
         {
             // Timeout return empty credentials
-            return "";
+            return std::nullopt;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -48,35 +54,27 @@ std::string requestMQTTcredentials(std::shared_ptr<VsomeipAgent> vsomeipagent)
     return vsomeipagent->getBackEndResponse().first;
 }
 
-void gpsPublisher(std::pair<std::string, std::string> credentials, std::shared_ptr<VsomeipAgent> vsomeipagent, std::shared_ptr<std::atomic<bool>> transmissionState)
+void gpsPublisher(std::shared_ptr<mqtt::async_client> client, std::string gpsTopic,std::shared_ptr<VsomeipAgent> vsomeipagent, std::shared_ptr<std::atomic<bool>> transmissionState)
 {
-    using namespace std;
-    using namespace std::chrono;
-    // TODO: change this to a real client ID
-    auto client = std::make_shared<mqtt::async_client>(DFLT_SERVER_ADDRESS, "abcd");
-
-    // Connect options for a persistent session and automatic reconnects.
-    auto connOpts = mqtt::connect_options_builder()
-                        .clean_session(false)
-                        .user_name(credentials.first)
-                        .password(credentials.second)
-                        .automatic_reconnect(seconds(2), seconds(30))
-                        .finalize();
-
-    client->start_consuming();
-
-    cout << "Connecting to the MQTT server at " << DFLT_SERVER_ADDRESS << "..." << flush;
-    auto rsp = client->connect(connOpts)->get_connect_response();
-
     while (true)
     {
         if (transmissionState->load())
+        {
             // TODO: publish to a real topic
-            client->publish("events/gps", vsomeipagent->getGpsCoordinates(), 0, false)->wait();
+            #if TESTING_MODE
+            std::string data = vsomeipagent->getGpsCoordinates();
+            if(data == "")
+            {
+                data = " \"lat\": 30.037064667, \"lng\": 31.400575333 ";
+            }
+            client->publish(gpsTopic, data, 0, false)->wait();
+            #else
+            client->publish(gpsTopic, vsomeipagent->getGpsCoordinates(), 0, false)->wait();
+            #endif
+        }
         else
         {
             std::cout << "\n\n\n stopping transmission of GPS! \n\n\n";
-            client->disconnect();
             return;
         }
         std::cout << "published hello \n";
@@ -88,14 +86,30 @@ void mqttHandler(std::shared_ptr<VsomeipAgent> vsomeipagent)
 {
     using namespace std;
     using namespace std::chrono;
+
+    std::optional<std::string> backendResponse;
+    while(!backendResponse.has_value())
+        backendResponse = requestMQTTcredentials(vsomeipagent);
+
+    std::cout << "cred " << backendResponse.value() << '\n';
     std::string address = DFLT_SERVER_ADDRESS;
+
+    using json = nlohmann::json;
+    json credentials = json::parse(backendResponse.value());
 
     // TODO: check client ID
     // Create an MQTT client using a smart pointer to be shared among threads.
+    #if TESTING_MODE == 0
     auto client = std::make_shared<mqtt::async_client>(address, CLIENT_ID);
-
+    #else
+    auto client = std::make_shared<mqtt::async_client>(address, "tester_gps_mqtt");
+    #endif
     auto connOpts = mqtt::connect_options_builder()
                         .clean_session(true)
+                        #if TESTING_MODE == 0
+                        .user_name(credentials["username"])
+                        .password(credentials["pwd"])
+                        #endif
                         .automatic_reconnect(seconds(2), seconds(30))
                         .finalize();
 
@@ -124,24 +138,18 @@ void mqttHandler(std::shared_ptr<VsomeipAgent> vsomeipagent)
             // TODO: insert real Topic and change to static constexpr
             if (msg->get_topic() == "request/gps/start")
             {
-                std::string credentials = requestMQTTcredentials(vsomeipagent);
-                std::cout << "GOT the credentials: " << credentials << '\n';
-                if (credentials == "")
+
+                std::string gpsTopic = msg->get_payload();
+                std::cout << "gps topic: " << gpsTopic << '\n';
+                if (transmissionState->load() == false)
                 {
-                    std::cout << "failed to get credentials\n";
-                }
-                else
-                {
-                    if (transmissionState->load() == false)
+                    transmissionState->store(true);
+                    // TODO: insert real username and password
+                    // std::pair<std::string, std::string> credentials = std::make_pair("username___", "password____");
+                    if (gpsMQTTthread.joinable())
                     {
-                        transmissionState->store(true);
-                        // TODO: insert real username and password
-                        std::pair<std::string, std::string> credentials = std::make_pair("username___", "password____");
-                        if (gpsMQTTthread.joinable())
-                        {
-                            gpsMQTTthread.join();
-                            gpsMQTTthread = std::thread(gpsPublisher, credentials, vsomeipagent, transmissionState);
-                        }
+                        gpsMQTTthread.join();
+                        gpsMQTTthread = std::thread(gpsPublisher, client, gpsTopic, vsomeipagent, transmissionState);
                     }
                 }
             }
@@ -176,7 +184,22 @@ int main(int argc, char **argv)
 
         std::thread mqttThread([&]()
                                { mqttHandler(vsomeipAgnet); });
+        using json = nlohmann::json;
 
+        // while(1)
+        // {
+        //     // json jsonRequest;
+        //     // jsonRequest["route"] = "abc";
+        //     // jsonRequest["data"] = "aaabc";
+        //     // std::string aa = jsonRequest.dump(4);
+        //     // vsomeipAgnet->sendToBackEndGateWay(aa);
+        //     std::optional<std::string> credential;
+        //     while(!credential.has_value())
+        //         credential = requestMQTTcredentials(vsomeipAgnet);
+
+        //     std::cout << "cred " << credential.value() << '\n';
+        //     std::this_thread::sleep_for(std::chrono::seconds(2));
+        // }
         t.join();
         mqttThread.join();
         return 0;

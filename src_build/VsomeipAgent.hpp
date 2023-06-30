@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iomanip>
 #include <mutex>
+#include <map>
 #include "vsomeip/vsomeip.hpp"
 
 #include "mqtt_vsome_ip_conf.hpp"
@@ -34,6 +35,8 @@ public:
                 std::string response((char *)_response->get_payload()->get_data(), _response->get_payload()->get_length());
                 m_backEndResponseUpdate = {response, true};
             });
+
+            // BACKEND_SERVER_CHECK_INTERNET_CONNECTION_METHOD_ID
 
         app_->register_availability_handler(BACKEND_REQUEST_SERVER_SERVICE_ID, BACKEND_REQUEST_SERVER_INSTANCE_ID,
                                             std::bind(&VsomeipAgent::on_availability,
@@ -103,10 +106,11 @@ public:
     void on_availability(vsomeip::service_t _service, vsomeip::instance_t _instance, bool _is_available)
     {
         std::cout << "Service ["
-                  << std::setw(4) << std::setfill('0') << std::hex << _service << "." << _instance
+                  << _service << "." << _instance
                   << "] is "
                   << (_is_available ? "available." : "NOT available.")
                   << '\n';
+        serviceAvailability[_service] = _is_available;
     }
 
     void gpsEventHandle(const std::shared_ptr<vsomeip::message> &_response)
@@ -141,6 +145,8 @@ public:
         app_->send(request_);
     }
 
+public:
+    std::map<vsomeip::service_t, bool> serviceAvailability;
 private:
     std::shared_ptr<vsomeip::application> app_;
     bool use_tcp_;
