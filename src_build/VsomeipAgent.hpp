@@ -36,8 +36,6 @@ public:
                 m_backEndResponseUpdate = {response, true};
             });
 
-            // BACKEND_SERVER_CHECK_INTERNET_CONNECTION_METHOD_ID
-
         app_->register_availability_handler(BACKEND_REQUEST_SERVER_SERVICE_ID, BACKEND_REQUEST_SERVER_INSTANCE_ID,
                                             std::bind(&VsomeipAgent::on_availability,
                                                       this,
@@ -84,6 +82,7 @@ public:
     {
         if (_state == vsomeip::state_type_e::ST_REGISTERED)
         {
+            app_->request_service(BACKEND_REQUEST_SERVER_SERVICE_ID, BACKEND_REQUEST_SERVER_INSTANCE_ID);
             app_->request_service(GNSS_REQUEST_SERVICE_ID, GNSS_REQUEST_INSTANCE_ID);
             std::set<vsomeip::eventgroup_t> its_groups;
             its_groups.insert(GNSS_REQUEST_EVENTGROUP_ID);
