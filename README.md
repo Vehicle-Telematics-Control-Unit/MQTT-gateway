@@ -13,5 +13,5 @@ $ docker build -t mqtt_gateway .
 ```
 ### run with
 ```bash
-$ docker run -it --privileged --net host -v /tmp:/tmp:z mqtt_gateway
+$ docker run --name mqtt_gateway -it --rm --privileged --net host -v /tmp:/tmp:z mqtt_gateway
 ```

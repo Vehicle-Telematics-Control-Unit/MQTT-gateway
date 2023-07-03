@@ -70,8 +70,12 @@ void gpsPublisher(std::shared_ptr<mqtt::async_client> client, std::string gpsTop
             }
             client->publish(gpsTopic, data, 0, false)->wait();
             #else
-            if(vsomeipagent->getGpsCoordinates() != "")
-            client->publish(gpsTopic, vsomeipagent->getGpsCoordinates(), 0, false)->wait();
+            std::string GPSdataStr = vsomeipagent->getGpsCoordinates();
+            if(GPSdataStr != "")
+            {
+                client->publish(gpsTopic, GPSdataStr, 0, false)->wait();
+                std::cout << "Sent: "<< GPSdataStr << '\n';
+            }
             #endif
             std::cout << "published data!\n";
         }

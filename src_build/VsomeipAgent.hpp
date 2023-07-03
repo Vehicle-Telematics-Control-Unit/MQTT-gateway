@@ -114,10 +114,7 @@ public:
 
     void gpsEventHandle(const std::shared_ptr<vsomeip::message> &_response)
     {
-        // std::stringstream its_message;
         std::string str((char *)_response->get_payload()->get_data(), _response->get_payload()->get_length());
-        std::cout << str << "\n";
-        std::cout << _response->get_client();
         std::lock_guard<std::mutex> lock(m_gps_mutex);
         m_gpsdata = std::move(str);
     }
