@@ -2,9 +2,7 @@ FROM vsomeip_build:v0
 
 
 RUN apk update && \
-    apk add --no-cache openssl
-
-RUN apk add --no-cache openssl-dev
+    apk add --no-cache openssl openssl-dev
 
 WORKDIR /
 

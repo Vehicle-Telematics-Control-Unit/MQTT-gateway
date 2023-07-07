@@ -9,9 +9,11 @@ $ docker build -t mqtt-paho-vsomeip .
 ```
 ### build with
 ```bash
-$ docker build -t mqtt_gateway .
+$ docker buildx build --push \
+--platform linux/amd64,linux/arm64 \
+--tag registry.digitalocean.com/vehicle-plus/tcu_mqtt-gateway:v0 .
 ```
 ### run with
 ```bash
-$ docker run --name mqtt_gateway -it --rm --privileged --net host -v /tmp:/tmp:z mqtt_gateway
+$ docker run --name mqtt_gateway -it --rm --privileged --net host -v /tmp:/tmp:z registry.digitalocean.com/vehicle-plus/tcu_mqtt-gateway:v0
 ```
